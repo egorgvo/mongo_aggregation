@@ -3,6 +3,7 @@
 
 import logging
 from copy import copy
+from functools import partial
 from itertools import chain, combinations, product
 
 from .patterns import dollar_prefix, pop_dollar_prefix
@@ -21,15 +22,18 @@ class MongoAggregation(list):
     def aggregate(self, collection='', allowDiskUse=False, as_list=False, collation=None):
         if collection:
             self.collection = collection
+        if self.collection.__class__.__name__ == 'TopLevelDocumentMetaclass':
+            self.collection = self.collection.objects
         if allowDiskUse:
             self.allowDiskUse = allowDiskUse
         if self.collection.__class__.__name__ != 'QuerySet' and not self.collection:
             logger.error('Агрегация невозможна: не указана коллекция')
             return
+        aggregate = partial(self.collection.aggregate, allowDiskUse=self.allowDiskUse, collation=collation)
         if self.collection.__class__.__name__ == 'QuerySet':
-            result = self.collection.aggregate(*self.pipeline, allowDiskUse=self.allowDiskUse, collation=collation)
+            result = aggregate(*self.pipeline)
         else:
-            result = self.collection.aggregate(self.pipeline, allowDiskUse=self.allowDiskUse, collation=collation)
+            result = aggregate(self.pipeline)
         return list(result) if as_list else result
 
     def append(self, object=None, *args):
@@ -45,6 +49,9 @@ class MongoAggregation(list):
 
     def extend(self, object=None, *args):
         self.append(object, *args)
+
+    def count(self):
+        self.pipeline.append({'$count': 'count'})
 
     def match(self, *args, **kwargs):
         if args:
@@ -497,6 +504,27 @@ class MongoAggregation(list):
             return None
         return LastStage(self.pipeline)
 
+    def revert_last_stage(self):
+        if not self.pipeline:
+            return
+        self.pipeline = self.pipeline[:-1]
+
+    def get_first(self, default=None, **kwargs):
+        # Limit pipeline to 1 document
+        self.limit(1)
+        # Get first document to include statistics_today lately
+        first_doc = next(self.aggregate(**kwargs), default)
+        # Undo limit
+        self.revert_last_stage()
+        return first_doc
+
+    def get_count(self, **kwargs):
+        self.count()
+        count = next(self.aggregate(**kwargs), {}).get('count', 0)
+        # Revert last stage
+        self.revert_last_stage()
+        return count
+
 
 class LastStage():
 
@@ -528,9 +556,10 @@ class LastStage():
 if __name__ == "__main__":
     import logging
     import os
-    from os.path import abspath, dirname, join
 
     from dotenv import load_dotenv
+
+    load_dotenv()
 
     mongo_connection = os.environ.get('MONGODB_HOST', 'mongodb://localhost:27017/test')
     import pymongo
