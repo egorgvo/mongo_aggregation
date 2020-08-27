@@ -1,6 +1,12 @@
 # mongo_aggregation
 Python MongoDB Aggregation ORM class.
 
+### Installation
+
+```bash
+pip install mongo_aggregation
+```
+
 ### Usage examples
 
 ```python
