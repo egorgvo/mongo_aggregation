@@ -13,6 +13,17 @@ def project_set_value(expression):
     return {'$cond': [True, expression, '']}
 
 
+def filter_(input, condition, as_field=''):
+    """Selects a subset of an array to return based on the specified condition.
+    Returns an array with only those elements that match the condition.
+    The returned elements are in the original order.
+    From mongo version 3.2."""
+    filter_stage = {'input': input, 'cond': condition}
+    if as_field:
+        filter_stage['as'] = as_field
+    return {'$filter': filter_stage}
+
+
 def roundHalfUp(expression, signs_after_dot=0):
     abs_expression = {'$abs': expression}
     sign = {'$cond': [{'$gt': [expression, 0]}, 1, -1]}

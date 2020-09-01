@@ -58,3 +58,10 @@ By default aggregate returns cursor. If you want it to return a list of document
 ```
 cursor = pipeline.aggregate(as_list=True)
 ```
+
+## Changelog
+
+### 1.0.2 (2020-09-01)
+
+- Added `$addFields` and `$set` stages.
+- Added `$filter` operator.

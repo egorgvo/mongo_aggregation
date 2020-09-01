@@ -195,7 +195,28 @@ class MongoAggregation(list):
                 if not all_levels: break
         return parents
 
+    def add_fields(self, **kwargs):
+        """Adds new fields to documents.
+        $addFields outputs documents that contain all existing fields from the input documents and newly added fields.
+        From MongoDB version 3.4
+        Starting in version 4.2, MongoDB adds a new aggregation pipeline stage $set that is an alias for $addFields.
+        """
+        kwargs = self._convert_names_with_underlines_to_dots(kwargs)
+        self.pipeline.append({'$addFields': kwargs})
+        self._add_to_actual_fields(kwargs.keys())
+        return self
+
+    def set(self, **kwargs):
+        """Adds new fields to documents.
+        $set outputs documents that contain all existing fields from the input documents and newly added fields.
+        From MongoDB version 4.2."""
+        kwargs = self._convert_names_with_underlines_to_dots(kwargs)
+        self.pipeline.append({'$set': kwargs})
+        self._add_to_actual_fields(kwargs.keys())
+        return self
+
     def smart_project(self, include_fields='', exclude_fields='', include_all_by_default=True, *args, **kwargs):
+        """Custom realization of $addFields for an older versions of MongoDB. Bases on $project stage."""
         if not include_all_by_default:
             self.actual_fields = set()
 
