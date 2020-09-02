@@ -6,7 +6,9 @@ from copy import copy
 from functools import partial
 from itertools import chain, combinations, product
 
-from .patterns import dollar_prefix, pop_dollar_prefix
+import six
+
+from .patterns import dollar_prefix, pop_dollar_prefix, _convert_names_with_underlines_to_dots
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +61,7 @@ class MongoAggregation(list):
                 self.pipeline.append({
                     '$match': arg
                 })
-        self._convert_names_with_underlines_to_dots(kwargs, convert_operators=True)
+        kwargs = _convert_names_with_underlines_to_dots(kwargs, convert_operators=True)
         if args and kwargs:
             self.pipeline[-1]['$match'].update(kwargs)
         elif kwargs:
@@ -102,7 +104,14 @@ class MongoAggregation(list):
         return self
 
     def sort(self, *args, **kwargs):
-        self._convert_names_with_underlines_to_dots(kwargs)
+        def _prepare_str_order_rule(order_rule):
+            if not isinstance(order_rule, six.string_types):
+                return order_rule
+            sign = -1 if order_rule.startswith('-') else 1
+            sort_field = order_rule.strip('-+')
+            return {sort_field: sign}
+
+        kwargs = _convert_names_with_underlines_to_dots(kwargs)
         # Складываем все в args
         args = list(args)
         if kwargs:
@@ -110,9 +119,10 @@ class MongoAggregation(list):
 
         if not args: return self
         # Делаем project
-        for arg in args:
-            self.pipeline.append({"$sort": arg})
-            self._add_to_actual_fields(arg.keys())
+        for order_rule in args:
+            order_rule = _prepare_str_order_rule(order_rule)
+            self.pipeline.append({"$sort": order_rule})
+            self._add_to_actual_fields(order_rule.keys())
         return self
 
     def skip(self, offset=0):
@@ -126,7 +136,7 @@ class MongoAggregation(list):
         return self
 
     def project(self, *args, **kwargs):
-        self._convert_names_with_underlines_to_dots(kwargs)
+        kwargs = _convert_names_with_underlines_to_dots(kwargs)
         # Складываем все в args
         if args and kwargs:
             args[-1].update(kwargs)
@@ -195,13 +205,22 @@ class MongoAggregation(list):
                 if not all_levels: break
         return parents
 
+    def replace_root(self, expression):
+        """Replaces the input document with the specified document.
+        The operation replaces all existing fields in the input document, including the _id field.
+        From MongoDB version 3.4."""
+        if isinstance(expression, six.string_types):
+            expression = dollar_prefix(expression)
+        self.pipeline.append({'$replaceRoot': {'newRoot': expression}})
+        return self
+
     def add_fields(self, **kwargs):
         """Adds new fields to documents.
         $addFields outputs documents that contain all existing fields from the input documents and newly added fields.
         From MongoDB version 3.4
         Starting in version 4.2, MongoDB adds a new aggregation pipeline stage $set that is an alias for $addFields.
         """
-        kwargs = self._convert_names_with_underlines_to_dots(kwargs)
+        kwargs = _convert_names_with_underlines_to_dots(kwargs)
         self.pipeline.append({'$addFields': kwargs})
         self._add_to_actual_fields(kwargs.keys())
         return self
@@ -210,7 +229,7 @@ class MongoAggregation(list):
         """Adds new fields to documents.
         $set outputs documents that contain all existing fields from the input documents and newly added fields.
         From MongoDB version 4.2."""
-        kwargs = self._convert_names_with_underlines_to_dots(kwargs)
+        kwargs = _convert_names_with_underlines_to_dots(kwargs)
         self.pipeline.append({'$set': kwargs})
         self._add_to_actual_fields(kwargs.keys())
         return self
@@ -263,7 +282,7 @@ class MongoAggregation(list):
             self.actual_fields.update(include_fields)
 
         # Проверяем обращение к полям объекта с помощью __ в kwargs
-        self._convert_names_with_underlines_to_dots(kwargs)
+        kwargs = _convert_names_with_underlines_to_dots(kwargs)
 
         # Складываем kwargs в args
         args = self._add_kwargs_to_args(args, kwargs)
@@ -457,7 +476,7 @@ class MongoAggregation(list):
         if not fields: return
         if isinstance(fields, str):
             fields = fields.split(',')
-        fields = self._convert_names_with_underlines_to_dots(fields)
+        fields = _convert_names_with_underlines_to_dots(fields)
         if isinstance(fields, dict):
             fields = fields.keys()
         for field in fields:
@@ -467,7 +486,7 @@ class MongoAggregation(list):
         if not fields: return
         if isinstance(fields, str):
             fields = fields.split(',')
-        fields = self._convert_names_with_underlines_to_dots(fields)
+        fields = _convert_names_with_underlines_to_dots(fields)
         if isinstance(fields, dict):
             fields = fields.keys()
         for field in fields:
@@ -482,7 +501,7 @@ class MongoAggregation(list):
             group_by = group_by.split(',')
 
         # Преобразуем имена вида item__name к item.name
-        group_by = self._convert_names_with_underlines_to_dots(group_by)
+        group_by = _convert_names_with_underlines_to_dots(group_by)
 
         # Если group_by - словарь, считаем его сформированным корректно
         if isinstance(group_by, dict):
@@ -497,27 +516,6 @@ class MongoAggregation(list):
 
         # Опасная ситуация, но иначе никак - пусть группирует по всем строкам
         return None
-
-    @staticmethod
-    def _convert_names_with_underlines_to_dots(args, convert_operators=False):
-        """Проверяем обращение к полям объекта с помощью __ в словаре"""
-        for i, arg in enumerate(copy(args)):
-            if '__' not in arg:
-                continue
-            elif arg.startswith('__') or arg.endswith('__'):
-                continue
-            replacement = arg.replace('__', '.')
-            if isinstance(args, list):
-                args.pop(i)
-                args.insert(i, replacement)
-            else:
-                if convert_operators:
-                    potential_operator = replacement[replacement.rfind('.')+1:]
-                    if potential_operator in ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'nin']:
-                        args[replacement[:replacement.rfind('.')]] = {dollar_prefix(potential_operator): args.pop(arg)}
-                        continue
-                args[replacement] = args.pop(arg)
-        return args
 
     @property
     def last_stage(self):

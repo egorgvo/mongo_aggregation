@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
 
-from copy import deepcopy
+from copy import copy, deepcopy
 
 
 def field_is_specified(field):
@@ -119,6 +119,18 @@ def set_value(expression):
     return {'$literal': expression}
 
 
+def regex(pattern, options='', i=False, m=False, x=False, s=False, extra_fields=None):
+    """Provides regular expression capabilities for pattern matching strings in queries."""
+    expression = {'$regex': pattern}
+    if not options:
+        options = f'{"i" if i else ""}{"m" if m else ""}{"x" if x else ""}{"s" if s else ""}'
+    if options:
+        expression['$options'] = options
+    if extra_fields:
+        expression.update(extra_fields)
+    return expression
+
+
 def hide_fields(fields_to_hide, visible_fields, concealer_field='_id'):
     if isinstance(fields_to_hide, str):
         fields_to_hide = fields_to_hide.split(',')
@@ -177,7 +189,33 @@ def cond(condition, then_value, else_value=0):
 
 
 def _and(*args):
+    """Deprecated."""
+    return and_(*args)
+
+
+def and_(*args, **kwargs):
+    """Performs a logical AND operation on an array of one or more expressions
+    (e.g. <expression1>, <expression2>, etc.) and selects the documents that
+    satisfy all the expressions in the array."""
+    # Складываем все в args
+    args = list(args)
+    if kwargs:
+        kwargs = _convert_names_with_underlines_to_dots(kwargs, convert_operators=True)
+        kwargs = [{key: value} for key, value in kwargs.items()]
+        args.extend(kwargs)
     return {'$and': args}
+
+
+def or_(*args, **kwargs):
+    """Performs a logical OR operation on an array of two or more expressions
+    and selects the documents that satisfy at least one of the expressions."""
+    # Складываем все в args
+    args = list(args)
+    if kwargs:
+        kwargs = _convert_names_with_underlines_to_dots(kwargs, convert_operators=True)
+        kwargs = [{key: value} for key, value in kwargs.items()]
+        args.extend(kwargs)
+    return {'$or': args}
 
 
 def eq(first_expression, second_expression=True):
@@ -273,6 +311,31 @@ def aggr_sum(*args):
     if len(args) == 1:
         return {'$sum': args[0]}
     return {'$sum': _list_dollar_prefix(*args)}
+
+
+def _convert_names_with_underlines_to_dots(args, convert_operators=False):
+    """Проверяем обращение к полям объекта с помощью __ в словаре"""
+    for i, arg in enumerate(copy(args)):
+        if '__' not in arg:
+            continue
+        elif arg.startswith('__') or arg.endswith('__'):
+            continue
+        replacement = arg.replace('__', '.')
+        if isinstance(args, list):
+            args.pop(i)
+            args.insert(i, replacement)
+        else:
+            if convert_operators:
+                potential_operator = replacement[replacement.rfind('.')+1:]
+                if potential_operator in ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'nin']:
+                    args[replacement[:replacement.rfind('.')]] = {dollar_prefix(potential_operator): args.pop(arg)}
+                    continue
+                elif potential_operator in ['regex', 'iregex', 'icontains', 'contains']:
+                    ignore_case = potential_operator.startswith('i')
+                    args[replacement[:replacement.rfind('.')]] = regex(args.pop(arg), i=ignore_case)
+                    continue
+            args[replacement] = args.pop(arg)
+    return args
 
 
 if __name__ == '__main__':

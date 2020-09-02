@@ -52,16 +52,73 @@ for doc in cursor:
     break
 ```
 
+#### Methods description
+
+- [$replaceRoot](https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/)
+```python
+pipeline.replace_root('doctor')
+# {'$replaceRoot': {'newRoot': '$doctor'}}
+```
+
 #### Response as list
 
 By default aggregate returns cursor. If you want it to return a list of documents use `as_list` argument:
 ```
-cursor = pipeline.aggregate(as_list=True)
+data = pipeline.aggregate(as_list=True)
 ```
 
-## Changelog
+### Patterns module
 
-### 1.0.2 (2020-09-01)
+Provides operators and some other patterns in python functions way.
+
+Imports:
+```python
+from mongo_aggregation.patterns import regex
+```
+
+- [$and](https://docs.mongodb.com/manual/reference/operator/query/and/)
+```python
+and_({'a': True}, b=True, c=True)
+# {'$and': [{'a': True}, {'b': True}, {'c': True}]}
+```
+
+- [$or](https://docs.mongodb.com/manual/reference/operator/query/or/)
+```python
+or_({'a': True}, b=True, c=True)
+# {'$or': [{'a': True}, {'b': True}, {'c': True}]}
+```
+
+- [$regex](https://docs.mongodb.com/manual/reference/operator/query/regex/)
+```python
+regex('name', i=True)
+# {'$regex': 'name', '$options': 'i'}
+```
+
+#### Aggregation patterns module
+Provides aggregation operators and some other patterns in python functions way.
+
+Imports:
+```python
+from mongo_aggregation.aggr_patterns import merge_objects
+```
+
+- [$mergeObjects](https://docs.mongodb.com/manual/reference/operator/aggregation/mergeObjects/)
+```python
+merge_objects('$doctor', first_name='John', last_name='Doe')
+# {'$mergeObjects': ['$doctor', {'first_name': 'John', 'last_name': 'Doe'}]}
+```
+
+### Changelog
+
+#### 1.0.3 (2020-09-01)
+
+- `.sort` now supports `-email` sorting format (direction and field name by string).
+- Added `.replace_root` method.
+- Added `or_` and `and_` logical operators. `_and` is deprecated now.
+- Added `regex` operator pattern.
+- Added `merge_objects` aggregation operator (`./aggr_patterns`).
+
+#### 1.0.2 (2020-09-01)
 
 - Added `$addFields` and `$set` stages.
 - Added `$filter` operator.
