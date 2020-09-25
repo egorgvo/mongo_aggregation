@@ -56,6 +56,8 @@ class MongoAggregation(list):
         self.pipeline.append({'$count': 'count'})
 
     def match(self, *args, **kwargs):
+        if not args and not kwargs:
+            return self
         if args:
             for arg in args:
                 self.pipeline.append({

@@ -110,6 +110,10 @@ merge_objects('$doctor', first_name='John', last_name='Doe')
 
 ### Changelog
 
+#### 1.0.4 (2020-09-25)
+
+- Bug fixes.
+
 #### 1.0.3 (2020-09-01)
 
 - `.sort` now supports `-email` sorting format (direction and field name by string).
