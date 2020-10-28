@@ -105,6 +105,9 @@ class MongoAggregation(list):
         self._add_to_actual_fields(field, ignore_if_theres_children=True)
         return self
 
+    def order_by(self, *args, **kwargs):
+        return self.sort(*args, **kwargs)
+
     def sort(self, *args, **kwargs):
         def _prepare_str_order_rule(order_rule):
             if not isinstance(order_rule, six.string_types):

@@ -54,6 +54,25 @@ for doc in cursor:
 
 #### Methods description
 
+- [$sort](https://docs.mongodb.com/manual/reference/operator/aggregation/sort/)
+```python
+pipeline.sort('-doctor')
+# {'$sort': {'doctor': -1}}
+
+pipeline.sort({'doctor': 1})
+# {'$sort': {'doctor': 1}}
+
+pipeline.sort('doctor', '-patient')
+# [{'$sort': {'doctor': 1}}, {'$sort': {'-patient': 1}}]
+```
+
+- `order_by`
+is an alias to `sort`.
+```python
+pipeline.order_by('-doctor')
+# {'$sort': {'doctor': -1}}
+```
+
 - [$replaceRoot](https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/)
 ```python
 pipeline.replace_root('doctor')
@@ -109,6 +128,10 @@ merge_objects('$doctor', first_name='John', last_name='Doe')
 ```
 
 ### Changelog
+
+#### 1.0.5 (2020-09-25)
+
+- Added `order_by` method.
 
 #### 1.0.4 (2020-09-25)
 
