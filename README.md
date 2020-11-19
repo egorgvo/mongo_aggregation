@@ -169,7 +169,11 @@ Returns dictionary with specified fields as keys and values. For better understa
 
 ### Changelog
 
-#### 1.0.6 (2020-09-25)
+#### 1.0.7 (2020-09-19)
+
+- Small fix.
+
+#### 1.0.6 (2020-11-19)
 
 - Added `if_null` pattern.
 - Removed `get_count` method. `count` now returns count and does not add `count` stage.

@@ -420,6 +420,7 @@ class MongoAggregation(list):
         # Инициализируем stage группировки
         stage = {}
 
+        kwargs = _convert_names_with_underlines_to_dots(kwargs, convert_operators=True)
         # Добавляем kwargs и args в stage
         args = self._add_kwargs_to_args(args, kwargs)
         for arg in args:
