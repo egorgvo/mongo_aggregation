@@ -52,8 +52,12 @@ class MongoAggregation(list):
     def extend(self, object=None, *args):
         self.append(object, *args)
 
-    def count(self):
+    def count(self, **kwargs):
         self.pipeline.append({'$count': 'count'})
+        count = next(self.aggregate(**kwargs), {}).get('count', 0)
+        # Revert last stage
+        self.revert_last_stage()
+        return count
 
     def match(self, *args, **kwargs):
         if not args and not kwargs:
@@ -543,11 +547,7 @@ class MongoAggregation(list):
         return first_doc
 
     def get_count(self, **kwargs):
-        self.count()
-        count = next(self.aggregate(**kwargs), {}).get('count', 0)
-        # Revert last stage
-        self.revert_last_stage()
-        return count
+        return self.count(**kwargs)
 
 
 class LastStage():

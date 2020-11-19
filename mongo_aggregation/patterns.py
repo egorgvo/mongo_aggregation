@@ -3,6 +3,8 @@
 
 from copy import copy, deepcopy
 
+import six
+
 
 def field_is_specified(field):
     return {'$cond': [field, True, False]}
@@ -179,7 +181,13 @@ def switch_compare(field, cases_list, compare_method='$eq', final_else=''):
 
 
 def ifNull(field, value):
+    """$ifNull implementation."""
     return {'$ifNull': [dollar_prefix(field), value]}
+
+
+def if_null(field, value):
+    """$ifNull implementation."""
+    return ifNull(field, value)
 
 
 def cond(condition, then_value, else_value=0):
@@ -189,7 +197,7 @@ def cond(condition, then_value, else_value=0):
 
 
 def _and(*args):
-    """Deprecated."""
+    """Deprecated. Use and_ instead."""
     return and_(*args)
 
 
@@ -327,7 +335,7 @@ def _convert_names_with_underlines_to_dots(args, convert_operators=False):
         else:
             if convert_operators:
                 potential_operator = replacement[replacement.rfind('.')+1:]
-                if potential_operator in ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'nin']:
+                if potential_operator in ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'nin', 'push']:
                     args[replacement[:replacement.rfind('.')]] = {dollar_prefix(potential_operator): args.pop(arg)}
                     continue
                 elif potential_operator in ['regex', 'iregex', 'icontains', 'contains']:
@@ -336,6 +344,27 @@ def _convert_names_with_underlines_to_dots(args, convert_operators=False):
                     continue
             args[replacement] = args.pop(arg)
     return args
+
+
+def obj(*args, **kwargs):
+    """
+    Returns dictionary with specified fields as keys and values. See usage examples in tests below.
+
+    >>> obj('name,description')
+    {'name': '$name', 'description': '$description'}
+    >>> obj('name', 'description')
+    {'name': '$name', 'description': '$description'}
+    >>> obj('name,description', id='$code')
+    {'name': '$name', 'description': '$description', 'id': '$code'}
+    """
+    fields = [f for arg in args for f in arg.split(',') if isinstance(arg, six.string_types)]
+    for arg in args:
+        if isinstance(arg, dict):
+            kwargs.update(arg)
+    kwargs = _convert_names_with_underlines_to_dots(kwargs, convert_operators=True)
+    result = {pop_dollar_prefix(field): dollar_prefix(field) for field in fields}
+    result.update(kwargs)
+    return result
 
 
 if __name__ == '__main__':

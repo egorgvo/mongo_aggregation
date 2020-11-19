@@ -79,6 +79,14 @@ pipeline.replace_root('doctor')
 # {'$replaceRoot': {'newRoot': '$doctor'}}
 ```
 
+- [$count](https://docs.mongodb.com/manual/reference/operator/aggregation/count/)
+
+Returns count. Does not add stage.
+```python
+pipeline.count()
+2
+```
+
 #### Response as list
 
 By default aggregate returns cursor. If you want it to return a list of documents use `as_list` argument:
@@ -121,13 +129,51 @@ Imports:
 from mongo_aggregation.aggr_patterns import merge_objects
 ```
 
+- [$ifNull](https://docs.mongodb.com/manual/reference/operator/aggregation/ifNull/)  
+There are two variations:
+```python
+if_null('$doctor', {})
+{'$ifNull': ['$doctor', {}]}
+
+ifNull('$doctor', '')
+{'$ifNull': ['$doctor', '']}
+```
+
+Function looks after dollar prefix, so you can skip it: 
+```python
+if_null('doctor', {})
+{'$ifNull': ['$doctor', {}]}
+```
+
 - [$mergeObjects](https://docs.mongodb.com/manual/reference/operator/aggregation/mergeObjects/)
 ```python
 merge_objects('$doctor', first_name='John', last_name='Doe')
 # {'$mergeObjects': ['$doctor', {'first_name': 'John', 'last_name': 'Doe'}]}
 ```
 
+#### Others
+
+- `obj` function  
+Returns dictionary with specified fields as keys and values. For better understanding see usage examples below.
+
+```python
+>>> obj('name,description')
+{'name': '$name', 'description': '$description'}
+
+>>> obj('name', 'description')
+{'name': '$name', 'description': '$description'}
+
+>>> obj('name,description', id='$code')
+{'name': '$name', 'description': '$description', 'id': '$code'} 
+ ```
+
 ### Changelog
+
+#### 1.0.6 (2020-09-25)
+
+- Added `if_null` pattern.
+- Removed `get_count` method. `count` now returns count and does not add `count` stage.
+- Added `obj` pattern. 
 
 #### 1.0.5 (2020-09-25)
 
