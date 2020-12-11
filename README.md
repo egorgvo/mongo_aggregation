@@ -169,6 +169,10 @@ Returns dictionary with specified fields as keys and values. For better understa
 
 ### Changelog
 
+#### 1.0.8 (2020-12-11)
+
+- Added `and_`, `and_nor`, `and_or` methods to `MongoMatchFilter`.
+
 #### 1.0.7 (2020-09-19)
 
 - Small fix.
