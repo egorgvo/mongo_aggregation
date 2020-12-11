@@ -23,17 +23,48 @@ class MongoMatchFilter(dict):
 
         super(MongoMatchFilter, self).__setitem__(key, value)
 
-    def and_or(self, *args):
+    def and_(self, *args, **kwargs):
         """
-        Добавляет в mongo-запрос ключ $or. Во избежание неожиданной перезаписи ключа $or, ключи $or записываются в список условий $and.
+        Добавляет фильтр используя опертор and. Позволяет избежать ситуации, с дублированием ключей.
+        При необходимости создает ключ $and.
         :param value: Устанавливаемое значение
         :return: список условия $or
         """
-        if '$and' not in self:
-            self['$and'] = []
+        # Складываем все в args
+        args = list(args)
+        if kwargs:
+            args.append(kwargs)
+
+        for arg in args:
+            for key in arg:
+                if key in self:
+                    break
+            else:
+                self.update(arg)
+                continue
+            self.setdefault('$and', [])
+            self['$and'].append(arg)
+
+    def and_nor(self, *args):
+        """
+        Добавляет в mongo-запрос ключ $nor.
+        Во избежание перезаписи ключа $nor, ключи $nor записываются в список условий $and.
+        :param args: Список $nor
+        :return: список условия $or
+        """
+        self.and_or(*args, negative=True)
+
+    def and_or(self, *args, negative=False):
+        """
+        Добавляет в mongo-запрос ключ $or.
+        Во избежание перезаписи ключа $or, ключи $or записываются в список условий $and.
+        :param args: Список $or
+        :param negative: Флаг для использования $nor
+        :return: список условия $or
+        """
+        key = '$nor' if negative else '$or'
         or_dict = MongoMatchFilter()
-        or_dict['$or'] = args[0] if len(args) == 1 and isinstance(args[0], list) else list(args)
-        if len(or_dict['$or']) == 1:
-            or_dict = or_dict['$or'][0]
-        self['$and'].append(or_dict)
-        return self['$and'][-1].get('$or', self['$and'][-1])
+        or_dict[key] = args[0] if len(args) == 1 and isinstance(args[0], list) else list(args)
+        if len(or_dict[key]) == 1 and not negative:
+            or_dict = or_dict[key][0]
+        self.and_(or_dict)
