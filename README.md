@@ -145,6 +145,13 @@ if_null('doctor', {})
 {'$ifNull': ['$doctor', {}]}
 ```
 
+- [$in](https://docs.mongodb.com/manual/reference/operator/aggregation/in/)  
+There are two variations:
+```python
+in_('doctor', 'doctors')
+{'$in': ['$doctor', '$doctors']}
+```
+
 - [$mergeObjects](https://docs.mongodb.com/manual/reference/operator/aggregation/mergeObjects/)
 ```python
 merge_objects('$doctor', first_name='John', last_name='Doe')
@@ -168,6 +175,10 @@ Returns dictionary with specified fields as keys and values. For better understa
  ```
 
 ### Changelog
+
+#### 1.0.8 (2020-12-24)
+
+- Added `in_` aggregation pattern.
 
 #### 1.0.8 (2020-12-11)
 
