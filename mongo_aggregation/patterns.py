@@ -155,12 +155,15 @@ def _convert_names_with_underlines_to_dots(args, convert_operators=False):
         else:
             if convert_operators:
                 potential_operator = replacement[replacement.rfind('.')+1:]
+                field = replacement[:replacement.rfind('.')]
                 if potential_operator in ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'nin', 'push']:
-                    args[replacement[:replacement.rfind('.')]] = {dollar_prefix(potential_operator): args.pop(arg)}
+                    args.setdefault(field, {})
+                    args[field][dollar_prefix(potential_operator)] = args.pop(arg)
                     continue
                 elif potential_operator in ['regex', 'iregex', 'icontains', 'contains']:
                     ignore_case = potential_operator.startswith('i')
-                    args[replacement[:replacement.rfind('.')]] = regex(args.pop(arg), i=ignore_case)
+                    args.setdefault(field, {})
+                    args[field].update(regex(args.pop(arg), i=ignore_case))
                     continue
             args[replacement] = args.pop(arg)
     return args
