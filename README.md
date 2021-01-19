@@ -176,7 +176,11 @@ Returns dictionary with specified fields as keys and values. For better understa
 
 ### Changelog
 
-#### 1.0.8 (2020-12-24)
+#### 1.0.10 (2021-01-19)
+
+- Fixed bug with multiple operators for a field in a `_convert_names_with_underlines_to_dots` pattern.
+
+#### 1.0.9 (2020-12-24)
 
 - Added `in_` aggregation pattern.
 
