@@ -81,6 +81,12 @@ def gte(first_expression, second_expression=None):
     return {'$gte': [first_expression, second_expression]}
 
 
+def lte(first_expression, second_expression=None):
+    if second_expression is None:
+        return {'$lte': first_expression}
+    return {'$lte': [first_expression, second_expression]}
+
+
 def ne(first_expression, second_expression=True):
     if second_expression is True:
         return {'$not': [first_expression]}
