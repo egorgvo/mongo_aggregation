@@ -80,7 +80,8 @@ class MongoAggregation(list):
         ])
         return self
 
-    def lookup_unwind(self, collection, local_field='_id', as_field='', foreign_field='_id', preserveNullAndEmptyArrays=True):
+    def lookup_unwind(self, collection, local_field='_id', as_field='', foreign_field='_id',
+                      preserveNullAndEmptyArrays=True):
         if not as_field:
             as_field = local_field
         self.lookup(collection, local_field, as_field, foreign_field),
@@ -248,42 +249,6 @@ class MongoAggregation(list):
         if not include_all_by_default:
             self.actual_fields = set()
 
-        exclude_id = False
-        if exclude_fields:
-            exclude_fields = set(exclude_fields.split(','))
-            exclude_id = '_id' in exclude_fields
-        if exclude_fields and not include_all_by_default:
-            pass
-        elif exclude_fields:
-            for excl_field in exclude_fields:
-                if excl_field in self.actual_fields:
-                    self.actual_fields.discard(excl_field)
-                    # continue
-                # Убираем дочерние. К примеру:
-                # actual_fields = {'menu.elements.option', 'menu.elements.count', 'count'}
-                # exclude_field = 'menu.elements'
-                # Дочерние: 'menu.elements.option', 'menu.elements.count'
-                # Результат: actual_fields = {'count'}
-                child_fields = {
-                    act_field for act_field in self.actual_fields
-                    if '{}.'.format(excl_field) in act_field
-                }
-                if child_fields:
-                    self.actual_fields -= child_fields
-                    continue
-                # Обратная ситуация, когда
-                # actual_fields = {'menu.elements', 'count'}
-                # exclude_field = 'menu.elements.option'
-                # Решение неочевидное, пока делаем так:
-                # Отбрасываем последнее дочернее поле
-                # ('option' для 'menu.elements.option', останется 'menu.elements')
-                # Ищем соответствие; если находим, удаляем его, иначе идем дальше к родителю
-                # Результат: actual_fields = {'count'}
-                for parent in sorted(self.get_parents(excl_field, True), key=len, reverse=True):
-                    if parent not in self.actual_fields: continue
-                    self.actual_fields.discard(parent)
-                    break
-
         if include_fields:
             include_fields = set(include_fields.split(','))
             parent_fields = self.get_parents(include_fields, True)
@@ -296,53 +261,71 @@ class MongoAggregation(list):
         # Складываем kwargs в args
         args = self._add_kwargs_to_args(args, kwargs)
 
-        # def include_actual_fields_recursive(stage, field):
-        #     hierarchy = field.split('.')
-        #     for i in range(len(hierarchy)):
-        #         parent_field = '.'.join(hierarchy[:i + 1])
-        #         if i + 1 == len(hierarchy):
-        #             theres_children = any([f.startswith(f"{field}.") for f in stage])
-        #             if theres_children:
-        #                 return
-        #             break
-        #         if parent_field not in stage:
-        #             continue
-        #         elif not stage[parent_field] or not isinstance(stage[parent_field], dict):
-        #             return
-        #         elif stage[parent_field].keys()[0].startswith('$'):
-        #             return
-        #         include_actual_fields_recursive(stage[parent_field], '.'.join(hierarchy[i+1:]))
-        #         return
-        #     stage.setdefault(field, 1)
+        if exclude_fields:
+            exclude_fields = set(exclude_fields.split(','))
 
-        # for field in self._get_actual_fields_without_children():
-        #     include_actual_fields_recursive(args[-1], field)
+        if any(args) or include_fields:
+            # Exclude fields may contain some information of what fields to include (calculate by contradiction)
+            if exclude_fields:
+                # Add parents first
+                # actual_fields = {'count'}
+                # exclude_field = 'menu.elements.option'
+                # Parent: 'menu.elements'
+                # Result: actual_fields = {'count', 'menu.elements'}
+                for excl_field in exclude_fields:
+                    self.actual_fields.update(self.get_parents(excl_field, True))
+                for excl_field in exclude_fields:
+                    # Remove the field itself
+                    self.actual_fields.discard(excl_field)
+                    # Remove all children
+                    # actual_fields = {'menu.elements.option', 'menu.elements.count', 'count'}
+                    # exclude_field = 'menu.elements'
+                    # Children: 'menu.elements.option', 'menu.elements.count'
+                    # Result: actual_fields = {'count'}
+                    child_fields = {
+                        act_field for act_field in self.actual_fields
+                        if '{}.'.format(excl_field) in act_field
+                    }
+                    self.actual_fields -= child_fields
 
-        paths = self._get_stage_hierarchy_fields(args[-1])
-        if not paths and self.actual_fields:
-            prolong_fields = self.actual_fields
-        else:
-            prolong_fields = set([actual_field
-                                  for new_field, actual_field in product(paths, self.actual_fields)
-                                  if actual_field != new_field
-                                  and not actual_field.startswith(f'{new_field}.')
-                                  and not new_field.startswith(f'{actual_field}.')])
-        prolong_fields = self._get_fields_without_children(prolong_fields)
-        for field in prolong_fields:
-            args[-1].setdefault(field, 1)
+            paths = self._get_stage_hierarchy_fields(args[-1])
+            if not paths and self.actual_fields:
+                prolong_fields = self.actual_fields
+            else:
+                prolong_fields = set([actual_field
+                                      for new_field, actual_field in product(paths, self.actual_fields)
+                                      if actual_field != new_field
+                                      and not actual_field.startswith(f'{new_field}.')
+                                      and not new_field.startswith(f'{actual_field}.')])
+            prolong_fields = self._get_fields_without_children(prolong_fields)
+            for field in prolong_fields:
+                args[-1].setdefault(field, 1)
 
-        if exclude_id:
-            args[-1]['_id'] = 0
+            # Делаем project
+            if args:
+                for arg in args:
+                    self.pipeline.append({'$project': arg})
+                # Заполняем актуальные поля
+                self._set_actual_fields(self._get_stage_hierarchy_fields(arg))
 
-        # Делаем project
-        if args:
-            for arg in args:
-                self.pipeline.append({'$project': arg})
-            # Заполняем актуальные поля
-            actual_fields = self._get_stage_hierarchy_fields(arg)
-            if exclude_id:
-                actual_fields.remove('_id')
-            self._set_actual_fields(actual_fields)
+        # Then esclude fields and children
+        if exclude_fields:
+            # !!! This is the same section, we double it because it may save some fields in earlier projections
+            # Add parents first
+            for excl_field in exclude_fields:
+                self.actual_fields.update(self.get_parents(excl_field, True))
+            for excl_field in exclude_fields:
+                # Remove the field itself
+                self.actual_fields.discard(excl_field)
+                # Remove all children
+                child_fields = {
+                    act_field for act_field in self.actual_fields
+                    if '{}.'.format(excl_field) in act_field
+                }
+                self.actual_fields -= child_fields
+            # Exclude projection itself
+            self.pipeline.append({'$project': {field: 0 for field in exclude_fields}})
+
         return self
 
     def _get_stage_hierarchy_fields(self, stage, prefix=''):
@@ -455,8 +438,10 @@ class MongoAggregation(list):
             else:
                 _id_fields = stage['_id'].keys()
             for field in parent_fields:
-                if field in chain(stage, _id_fields): continue
-                elif field in exclude_fields: continue
+                if field in chain(stage, _id_fields):
+                    continue
+                elif field in exclude_fields:
+                    continue
                 stage[field] = {operator_by_default: dollar_prefix(field)}
 
         # Формируем actual_fields
@@ -590,6 +575,7 @@ if __name__ == "__main__":
     import pymongo
     from datetime import datetime
     from dateutil.relativedelta import relativedelta
+
     logger = logging.getLogger()
     client = pymongo.MongoClient(mongo_connection)
     db = client.get_default_database()
